@@ -14,10 +14,12 @@
 //
 
 syntax="proto2";
+
 import "heartbeat.proto";
 import "common.proto";
 
 package dingofs.pb.mds.topology;
+
 option cc_generic_services = true;
 option go_package = "dingofs/proto/topology";
 
