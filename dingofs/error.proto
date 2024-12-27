@@ -33,7 +33,11 @@ enum Errno {
   EREQUEST_FULL = 10008;
   EGEN_FSID = 10009;
   EREDIRECT = 10010;
-
+  ENOT_EMPTY = 10011;
+  ENOT_FILE = 10012;
+  ENOT_SYMLINK = 10013;
+  EOUT_OF_RANGE = 10014;
+  
   // cache error
 
   // backend store error
