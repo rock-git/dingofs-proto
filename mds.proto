@@ -16,7 +16,7 @@
 syntax="proto2";
 import "dingofs/proto/common.proto";
 import "dingofs/proto/topology.proto";
-package dingofs.mds;
+package dingofs.pb.mds;
 option cc_generic_services = true;
 option go_package = "dingofs/proto/mds";
 

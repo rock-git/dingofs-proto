@@ -16,7 +16,7 @@
 syntax="proto2";
 import "dingofs/proto/heartbeat.proto";
 import "dingofs/proto/common.proto";
-package dingofs.mds.topology;
+package dingofs.pb.mds.topology;
 option cc_generic_services = true;
 option go_package = "dingofs/proto/topology";
 
@@ -407,7 +407,7 @@ message GetCopysetsInfoRequest {
 
 message CopysetValue {
     required TopoStatusCode statusCode = 1;
-    optional dingofs.mds.heartbeat.CopySetInfo copysetInfo = 2;
+    optional dingofs.pb.mds.heartbeat.CopySetInfo copysetInfo = 2;
 }
 
 message GetCopysetsInfoResponse {

@@ -15,7 +15,7 @@
 
 syntax="proto2";
 import "dingofs/proto/common.proto";
-package dingofs.metaserver.copyset;
+package dingofs.pb.metaserver.copyset;
 option cc_generic_services = true;
 option go_package = "dingofs/proto/copyset";
 

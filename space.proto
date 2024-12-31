@@ -14,7 +14,7 @@
 //
 
 syntax="proto2";
-package dingofs.mds.space;
+package dingofs.pb.mds.space;
 import "dingofs/proto/common.proto";
 option cc_generic_services=true;
 option go_package = "dingofs/proto/space";

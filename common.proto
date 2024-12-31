@@ -14,7 +14,7 @@
 //
 
 syntax="proto2";
-package dingofs.common;
+package dingofs.pb.common;
 option cc_generic_services = true;
 option go_package = "dingofs/proto/common";
 

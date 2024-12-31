@@ -16,7 +16,7 @@
 
 syntax = "proto2";
 
-package dingofs.client;
+package dingofs.pb.client;
 option go_package = "dingofs/proto/client";
 option cc_generic_services = true;
 

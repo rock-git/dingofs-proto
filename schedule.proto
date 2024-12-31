@@ -14,7 +14,7 @@
 //
 
 syntax="proto2";
-package dingofs.mds.schedule;
+package dingofs.pb.mds.schedule;
 
 option cc_generic_services = true;
 option go_package = "dingofs/proto/schedule";
