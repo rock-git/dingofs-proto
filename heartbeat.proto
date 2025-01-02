@@ -14,7 +14,7 @@
 //
 
 syntax = "proto2";
-import "dingofs/proto/common.proto";
+import "common.proto";
 package dingofs.pb.mds.heartbeat;
 option cc_generic_services = true;
 option go_package = "dingofs/proto/heartbeat";
