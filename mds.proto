@@ -14,10 +14,12 @@
 //
 
 syntax="proto2";
+
 import "common.proto";
 import "topology.proto";
 
 package dingofs.pb.mds;
+
 option cc_generic_services = true;
 option go_package = "dingofs/proto/mds";
 
