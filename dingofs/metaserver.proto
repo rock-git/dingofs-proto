@@ -15,7 +15,7 @@
 
 syntax="proto2";
 
-import "common.proto";
+import "dingofs/common.proto";
 
 package dingofs.pb.metaserver;
 

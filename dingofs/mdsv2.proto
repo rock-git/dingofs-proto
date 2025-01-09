@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-import "error.proto";
+import "dingofs/error.proto";
 
 package dingofs.pb.mdsv2;
 

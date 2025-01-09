@@ -15,8 +15,8 @@
 
 syntax="proto2";
 
-import "heartbeat.proto";
-import "common.proto";
+import "dingofs/heartbeat.proto";
+import "dingofs/common.proto";
 
 package dingofs.pb.mds.topology;
 

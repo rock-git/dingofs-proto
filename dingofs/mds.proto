@@ -15,8 +15,8 @@
 
 syntax="proto2";
 
-import "common.proto";
-import "topology.proto";
+import "dingofs/common.proto";
+import "dingofs/topology.proto";
 
 package dingofs.pb.mds;
 
