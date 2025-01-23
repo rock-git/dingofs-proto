@@ -120,9 +120,9 @@ message Inode {
   FileType type = 14;
   string symlink = 15;
   uint64 rdev = 16;
-  map<uint64, S3ChunkList> s3_chunk_map = 18;
-  uint32 dtime = 19;
-  uint32 openmpcount = 20;
+  uint32 dtime = 17;
+  uint32 openmpcount = 18;
+  map<uint64, S3ChunkList> s3_chunk_map = 20;
   map<string, bytes> xattr = 21;
 }
 
@@ -462,7 +462,6 @@ message MkNodRequest {
   uint32 uid = 14;
   uint32 gid = 15;
   uint32 mode = 16;
-  FileType type = 17;
   uint64 parent_ino = 18;
   uint64 rdev = 19;
 }
@@ -485,7 +484,6 @@ message MkDirRequest {
   uint32 uid = 14;
   uint32 gid = 15;
   uint32 mode = 16;
-  FileType type = 17;
   uint64 parent_ino = 18;
   uint64 rdev = 19;
 }
@@ -515,7 +513,8 @@ message OpenDirRequest {
   RequestInfo request_info = 1;
   Context context = 2;
 
-  uint64 ino = 10;
+  uint32 fs_id = 10;
+  uint64 ino = 11;
 }
 
 
@@ -532,11 +531,13 @@ message ReadDirRequest {
   RequestInfo request_info = 1;
   Context context = 2;
 
-  uint64 ino = 10;
-  uint64 file_handle = 11;
-  uint32 limit = 12;
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  // uint64 file_handle = 12;
+  string last_name = 12;
+  uint32 limit = 13;
 
-  bool is_plus = 13;
+  bool with_attr = 14;
 }
 
 
@@ -546,7 +547,8 @@ message ReadDirResponse {
 
   message Entry {
     string name = 1;
-    Inode inode = 2;
+    uint64 ino = 2;
+    Inode inode = 3;
   }
   
   repeated Entry entries = 10;
@@ -557,8 +559,9 @@ message ReleaseDirRequest {
   RequestInfo request_info = 1;
   Context context = 2;
 
-  uint64 ino = 10;
-  uint64 file_handle = 11;
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  uint64 file_handle = 12;
 }
 
 message ReleaseDirResponse {
@@ -566,15 +569,40 @@ message ReleaseDirResponse {
   dingofs.pb.error.Error error = 2;
 }
 
+message OpenRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+}
+
+message OpenResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+message ReleaseRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+}
+
+message ReleaseResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
 
 message LinkRequest {
   RequestInfo request_info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
-  string name = 11;
-  uint64 ino = 12;
-  uint64 parent_ino = 13;
+  uint64 ino = 11;
+  uint64 new_parent_ino = 12;
+  string new_name = 13;
 }
 
 message LinkResponse {
@@ -604,15 +632,11 @@ message SymlinkRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  string name = 11;
-  uint32 flag = 12;
-  uint64 length = 13;
+  string symlink = 11;
+  uint64 new_parent_ino = 12;
+  string new_name = 13;
   uint32 uid = 14;
   uint32 gid = 15;
-  uint32 mode = 16;
-  uint64 parent_ino = 18;
-  uint64 rdev = 19;
-  string symlink = 20;   // TYPE_SYM_LINK only
 }
 
 message SymlinkResponse {
@@ -659,8 +683,7 @@ message SetAttrRequest {
   uint32 fs_id = 10;
   uint64 ino = 11;
 
-  // update field name,for example: ["ctime", "mtime", ...]
-  repeated string update_fields = 12;
+  uint32 to_set = 12;
 
   uint64 length = 20;
   uint64 ctime = 21;
@@ -729,9 +752,9 @@ message RenameRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 old_parent_inode_id = 11;
+  uint64 old_parent_ino = 11;
   string old_name = 12;
-  uint64 new_parent_inode_id = 13;
+  uint64 new_parent_ino = 13;
   string new_name = 14;
 }
 
@@ -760,12 +783,16 @@ service MDSService {
   
   // high level interface
   rpc Lookup(LookupRequest) returns (LookupResponse);
+
   rpc MkNod(MkNodRequest) returns (MkNodResponse);
   rpc MkDir(MkDirRequest) returns (MkDirResponse);
   rpc RmDir(RmDirRequest) returns (RmDirResponse);
-  rpc OpenDir(OpenDirRequest) returns (OpenDirResponse);
+  rpc OpenDir(OpenDirRequest) returns (OpenDirResponse); // deprecated
   rpc ReadDir(ReadDirRequest) returns (ReadDirResponse);
-  rpc ReleaseDir(ReleaseDirRequest) returns (ReleaseDirResponse);
+  rpc ReleaseDir(ReleaseDirRequest) returns (ReleaseDirResponse); // deprecated
+
+  rpc Open(OpenRequest) returns (OpenResponse);
+  rpc Release(ReleaseRequest) returns (ReleaseResponse);
 
   rpc Link(LinkRequest) returns (LinkResponse);
   rpc UnLink(UnLinkRequest) returns (UnLinkResponse);
