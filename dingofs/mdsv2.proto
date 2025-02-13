@@ -243,6 +243,18 @@ message GetFsInfoResponse {
   FsInfo fs_info = 10;
 }
 
+message RefreshFsInfoRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  string fs_name = 10;
+}
+
+message RefreshFsInfoResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
 // dentry interface
 message GetDentryRequest {
   RequestInfo request_info = 1;
@@ -823,6 +835,7 @@ service MDSService {
   rpc UmountFs(UmountFsRequest) returns (UmountFsResponse);
   rpc DeleteFs(DeleteFsRequest) returns (DeleteFsResponse);
   rpc GetFsInfo(GetFsInfoRequest) returns (GetFsInfoResponse);
+  rpc RefreshFsInfo(RefreshFsInfoRequest) returns (RefreshFsInfoResponse);
 
   // dentry interface
   rpc GetDentry(GetDentryRequest) returns (GetDentryResponse);

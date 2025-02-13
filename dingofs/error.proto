@@ -38,6 +38,7 @@ enum Errno {
   ENOT_SYMLINK = 10013;
   EOUT_OF_RANGE = 10014;
   ENO_DATA = 10015;
+  ENOT_SERVE = 10016;
   
   // cache error
 
