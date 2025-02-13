@@ -35,7 +35,7 @@ enum FsStatus {
 
 enum PartitionType {
   MONOLITHIC_PARTITION = 0;
-  PARENT_ID_PARTITION = 1;
+  PARENT_ID_HASH_PARTITION = 1;
 }
 
 enum FileType {
@@ -61,31 +61,55 @@ message S3Info {
   uint32 object_prefix = 7;
 }
 
-message FsDetail {
+message FsExtra {
   S3Info s3_info = 1;
+}
+
+message MonoPartition {
+  uint64 epoch = 1;
+  uint64 mds_id = 2;
+}
+
+message HashPartition {
+  message BucketSet {
+    repeated uint32 bucket_ids = 1;
+  }
+
+  uint64 epoch = 1;
+  // can't modify after create
+  uint32 bucket_num = 2;
+  // mdsid -> bucketset
+  map<uint64, BucketSet> distributions = 3;
+}
+
+message PartitionPolicy {
+  PartitionType type = 1;
+
+  oneof partition {
+    MonoPartition mono = 10;
+    HashPartition parent_hash = 11;
+  }
 }
 
 message FsInfo {
   uint32 fs_id = 1;
   string fs_name = 2;
-  FsStatus status = 3;
-  uint64 root_inode_id = 4;
-  uint64 capacity = 5;
-  uint64 block_size = 6;
+  FsType fs_type = 3;
+  FsStatus status = 4;
+  uint64 root_ino = 5;
+  uint64 capacity = 6;
+  uint64 block_size = 7;
   repeated MountPoint mount_points = 8;
-  FsType fs_type = 9;
-  PartitionType partition_type = 10;
-  FsDetail detail = 11;
+  PartitionPolicy partition_policy = 10;
   bool enable_sum_in_dir = 12; // enable sum in dir
   string owner = 13;
   uint32 recycle_time_hour = 15;
   string uuid = 16;
-  uint64 epoch = 20; // represent the epoch of the mds_ids
-  repeated uint64 mds_ids = 21; // the fs select mds
+  FsExtra extra = 20;
 }
 
-message S3Chunk {
-  uint64 chunk_id = 1;
+message Slice {
+  uint64 id = 1;
   uint64 compaction = 2;
   uint64 offset = 3;
   uint64 len = 4;
@@ -93,8 +117,8 @@ message S3Chunk {
   bool zero = 6;
 };
 
-message S3ChunkList {
-  repeated S3Chunk s3_chunks = 1;
+message SliceList {
+  repeated Slice slices = 1;
 };
 
 message Dentry {
@@ -122,8 +146,10 @@ message Inode {
   uint64 rdev = 16;
   uint32 dtime = 17;
   uint32 openmpcount = 18;
-  map<uint64, S3ChunkList> s3_chunk_map = 20;
-  map<string, bytes> xattr = 21;
+  repeated uint64 parent_inos = 19;
+  // chunk index -> slice list
+  map<uint64, SliceList> chunks = 20;
+  map<string, bytes> xattrs = 21;
 }
 
 message RequestInfo {
@@ -150,11 +176,12 @@ message CreateFsRequest {
   string fs_name = 10;
   uint64 block_size = 11;
   FsType fs_type = 12;
-  FsDetail fs_detail = 13;
+  FsExtra fs_extra = 13;
   bool enable_sum_in_dir = 14;
   string owner = 15;
   uint64 capacity = 16;
   uint32 recycle_time_hour = 17;
+  PartitionType partition_type = 18;
 }
 
 message CreateFsResponse {
@@ -253,25 +280,6 @@ message ListDentryResponse {
 }
 
 // inode interface
-message UpdateS3ChunkRequest {
-  RequestInfo request_info = 1;
-  Context context = 2;
-
-  uint32 fs_id = 10;
-  uint64 ino = 11;
-  map<uint64, S3ChunkList> s3_chunk_increment = 12;
-  map<uint64, S3ChunkList> s3_chunk_decrement = 13;
-  bool is_return = 14;
-  bool is_from_s3_compaction = 15;
-}
-
-message UpdateS3ChunkResponse {
-  ResponseInfo response_info = 1;
-  dingofs.pb.error.Error error = 2;
-
-  map<uint64, S3ChunkList> s3_chunk_map = 10;
-}
-
 message GetInodeRequest {
   RequestInfo request_info = 1;
   Context context = 2;
@@ -298,7 +306,7 @@ message BatchGetXAttrRequest {
 message XAttr {
   uint32 fs_id = 1;
   uint64 ino = 2;
-  map<string, bytes> xattr = 3;
+  map<string, bytes> xattrs = 3;
 }
 
 message BatchGetXAttrResponse {
@@ -763,6 +771,50 @@ message RenameResponse {
   dingofs.pb.error.Error error = 2;
 }
 
+message AllocSliceIdRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 alloc_num = 10;
+}
+
+message AllocSliceIdResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  repeated uint64 slice_ids = 10;
+}
+
+message WriteSliceRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  int64 chunk_index = 12;
+  SliceList slice_list = 13;
+}
+
+message WriteSliceResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+message ReadSliceRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  int64 chunk_index = 12;
+}
+
+message ReadSliceResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  SliceList slice_list = 10;
+}
 
 service MDSService {
   // fs interface
@@ -777,7 +829,6 @@ service MDSService {
   rpc ListDentry(ListDentryRequest) returns (ListDentryResponse);
 
   // inode interface
-  rpc UpdateS3Chunk(UpdateS3ChunkRequest) returns (UpdateS3ChunkResponse);
   rpc GetInode(GetInodeRequest) returns (GetInodeResponse);
   rpc BatchGetXAttr(BatchGetXAttrRequest) returns (BatchGetXAttrResponse);
   
@@ -806,6 +857,11 @@ service MDSService {
   rpc ListXAttr(ListXAttrRequest) returns (ListXAttrResponse);
 
   rpc Rename(RenameRequest) returns (RenameResponse);
+
+  // slice interface
+  rpc AllocSliceId(AllocSliceIdRequest) returns (AllocSliceIdResponse);
+  rpc WriteSlice(WriteSliceRequest) returns (WriteSliceResponse);
+  rpc ReadSlice(ReadSliceRequest) returns (ReadSliceResponse);
 
   // quota interface
   rpc SetFsQuota(SetFsQuotaRequest) returns (SetFsQuotaResponse);
