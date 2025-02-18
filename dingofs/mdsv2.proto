@@ -35,7 +35,7 @@ enum FsStatus {
 
 enum PartitionType {
   MONOLITHIC_PARTITION = 0;
-  PARENT_ID_PARTITION = 1;
+  PARENT_ID_HASH_PARTITION = 1;
 }
 
 enum FileType {
@@ -61,31 +61,55 @@ message S3Info {
   uint32 object_prefix = 7;
 }
 
-message FsDetail {
+message FsExtra {
   S3Info s3_info = 1;
+}
+
+message MonoPartition {
+  uint64 epoch = 1;
+  uint64 mds_id = 2;
+}
+
+message HashPartition {
+  message BucketSet {
+    repeated uint32 bucket_ids = 1;
+  }
+
+  uint64 epoch = 1;
+  // can't modify after create
+  uint32 bucket_num = 2;
+  // mdsid -> bucketset
+  map<uint64, BucketSet> distributions = 3;
+}
+
+message PartitionPolicy {
+  PartitionType type = 1;
+
+  oneof partition {
+    MonoPartition mono = 10;
+    HashPartition parent_hash = 11;
+  }
 }
 
 message FsInfo {
   uint32 fs_id = 1;
   string fs_name = 2;
-  FsStatus status = 3;
-  uint64 root_inode_id = 4;
-  uint64 capacity = 5;
-  uint64 block_size = 6;
+  FsType fs_type = 3;
+  FsStatus status = 4;
+  uint64 root_ino = 5;
+  uint64 capacity = 6;
+  uint64 block_size = 7;
   repeated MountPoint mount_points = 8;
-  FsType fs_type = 9;
-  PartitionType partition_type = 10;
-  FsDetail detail = 11;
+  PartitionPolicy partition_policy = 10;
   bool enable_sum_in_dir = 12; // enable sum in dir
   string owner = 13;
   uint32 recycle_time_hour = 15;
   string uuid = 16;
-  uint64 epoch = 20; // represent the epoch of the mds_ids
-  repeated uint64 mds_ids = 21; // the fs select mds
+  FsExtra extra = 20;
 }
 
-message S3Chunk {
-  uint64 chunk_id = 1;
+message Slice {
+  uint64 id = 1;
   uint64 compaction = 2;
   uint64 offset = 3;
   uint64 len = 4;
@@ -93,14 +117,14 @@ message S3Chunk {
   bool zero = 6;
 };
 
-message S3ChunkList {
-  repeated S3Chunk s3_chunks = 1;
+message SliceList {
+  repeated Slice slices = 1;
 };
 
 message Dentry {
   uint32 fs_id = 1;
-  uint64 inode_id = 2;
-  uint64 parent_inode_id = 3;
+  uint64 ino = 2;
+  uint64 parent_ino = 3;
   string name = 4;
   uint32 flag = 5;
   FileType type = 6;
@@ -108,7 +132,7 @@ message Dentry {
 
 message Inode {
   uint32 fs_id = 1;
-  uint64 inode_id = 2;
+  uint64 ino = 2;
   uint64 length = 3;
   uint64 ctime = 4;
   uint64 mtime = 5;
@@ -120,10 +144,12 @@ message Inode {
   FileType type = 14;
   string symlink = 15;
   uint64 rdev = 16;
-  map<uint64, S3ChunkList> s3_chunk_map = 18;
-  uint32 dtime = 19;
-  uint32 openmpcount = 20;
-  map<string, bytes> xattr = 21;
+  uint32 dtime = 17;
+  uint32 openmpcount = 18;
+  repeated uint64 parent_inos = 19;
+  // chunk index -> slice list
+  map<uint64, SliceList> chunks = 20;
+  map<string, bytes> xattrs = 21;
 }
 
 message RequestInfo {
@@ -150,11 +176,12 @@ message CreateFsRequest {
   string fs_name = 10;
   uint64 block_size = 11;
   FsType fs_type = 12;
-  FsDetail fs_detail = 13;
+  FsExtra fs_extra = 13;
   bool enable_sum_in_dir = 14;
   string owner = 15;
   uint64 capacity = 16;
   uint32 recycle_time_hour = 17;
+  PartitionType partition_type = 18;
 }
 
 message CreateFsResponse {
@@ -216,41 +243,25 @@ message GetFsInfoResponse {
   FsInfo fs_info = 10;
 }
 
+message RefreshFsInfoRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  string fs_name = 10;
+}
+
+message RefreshFsInfoResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
 // dentry interface
-
-message CreateDentryRequest {
-  RequestInfo request_info = 1;
-  Context context = 2;
-
-  uint32 fs_id = 10;
-  Dentry dentry = 11;
-}
-
-message CreateDentryResponse {
-  ResponseInfo response_info = 1;
-  dingofs.pb.error.Error error = 2;
-}
-
-message DeleteDentryRequest {
-  RequestInfo request_info = 1;
-  Context context = 2;
-
-  uint32 fs_id = 10; // required
-  uint64 inode_id = 11; // either inode_id or name 
-  string name = 12;
-}
-
-message DeleteDentryResponse {
-  ResponseInfo response_info = 1;
-  dingofs.pb.error.Error error = 2;
-}
-
 message GetDentryRequest {
   RequestInfo request_info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;  // required
-  uint64 inode_id = 11; // either inode_id or name 
+  uint64 ino = 11; // either ino or name 
   string name = 12;
 }
 
@@ -267,7 +278,7 @@ message ListDentryRequest {
   Context context = 2;
 
   uint32 fs_id = 10; // required
-  uint64 inode_id = 11; // parent inode id
+  uint64 ino = 11; // parent inode id
   string last = 12;     // the name of last entry
   uint32 limit = 13;    // the number of entry required
   bool is_only_dir = 14; // is only list dir
@@ -281,92 +292,12 @@ message ListDentryResponse {
 }
 
 // inode interface
-
-message CreateInodeRequest {
-  RequestInfo request_info = 1;
-  Context context = 2;
-
-  uint32 fs_id = 10;
-  uint64 length = 11;
-  uint32 uid = 12;
-  uint32 gid = 13;
-  uint32 mode = 14;
-  FileType type = 15;
-  uint64 parent_inode_id = 16;
-  uint64 rdev = 17;
-  string symlink = 18;   // TYPE_SYM_LINK only
-}
-
-
-message CreateInodeResponse {
-  ResponseInfo response_info = 1;
-  dingofs.pb.error.Error error = 2;
-
-  Inode inode = 10;
-}
-
-message DeleteInodeRequest {
-  RequestInfo request_info = 1;
-  Context context = 2;
-
-  uint32 fs_id = 10;
-  uint64 inode_id = 11;
-}
-
-message DeleteInodeResponse {
-  ResponseInfo response_info = 1;
-  dingofs.pb.error.Error error = 2;
-}
-
-message UpdateInodeRequest {
-  RequestInfo request_info = 1;
-  Context context = 2;
-
-  uint32 fs_id = 10;
-  uint64 inode_id = 11;
-  repeated string update_fields = 12; // update field name,for example: ["ctime", "mtime", ...]
-
-  uint64 length = 20;
-  uint64 ctime = 21;
-  uint64 mtime = 22;
-  uint64 atime = 23;
-  uint32 uid = 24;
-  uint32 gid = 25;
-  uint32 mode = 26;
-  uint32 nlink = 27;
-  map<string, bytes> xattr = 28;
-}
-
-message UpdateInodeResponse {
-  ResponseInfo response_info = 1;
-  dingofs.pb.error.Error error = 2;
-}
-
-message UpdateS3ChunkRequest {
-  RequestInfo request_info = 1;
-  Context context = 2;
-
-  uint32 fs_id = 10;
-  uint64 inode_id = 11;
-  map<uint64, S3ChunkList> s3_chunk_increment = 12;
-  map<uint64, S3ChunkList> s3_chunk_decrement = 13;
-  bool is_return = 14;
-  bool is_from_s3_compaction = 15;
-}
-
-message UpdateS3ChunkResponse {
-  ResponseInfo response_info = 1;
-  dingofs.pb.error.Error error = 2;
-
-  map<uint64, S3ChunkList> s3_chunk_map = 10;
-}
-
 message GetInodeRequest {
   RequestInfo request_info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 inode_id = 11;
+  uint64 ino = 11;
 }
 
 message GetInodeResponse {
@@ -386,8 +317,8 @@ message BatchGetXAttrRequest {
 
 message XAttr {
   uint32 fs_id = 1;
-  uint64 inode_id = 2;
-  map<string, bytes> xattr = 3;
+  uint64 ino = 2;
+  map<string, bytes> xattrs = 3;
 }
 
 message BatchGetXAttrResponse {
@@ -529,7 +460,7 @@ message LookupRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 parent_inode_id = 11;
+  uint64 parent_ino = 11;
   string name = 12;
 }
 
@@ -551,8 +482,7 @@ message MkNodRequest {
   uint32 uid = 14;
   uint32 gid = 15;
   uint32 mode = 16;
-  FileType type = 17;
-  uint64 parent_inode_id = 18;
+  uint64 parent_ino = 18;
   uint64 rdev = 19;
 }
 
@@ -574,8 +504,7 @@ message MkDirRequest {
   uint32 uid = 14;
   uint32 gid = 15;
   uint32 mode = 16;
-  FileType type = 17;
-  uint64 parent_inode_id = 18;
+  uint64 parent_ino = 18;
   uint64 rdev = 19;
 }
 
@@ -591,7 +520,7 @@ message RmDirRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 parent_inode_id = 11;
+  uint64 parent_ino = 11;
   string name = 12;
 }
 
@@ -600,20 +529,107 @@ message RmDirResponse {
   dingofs.pb.error.Error error = 2;
 }
 
+message OpenDirRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+}
+
+
+message OpenDirResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  // the file handle of the dir
+  uint64 file_handle = 10;
+}
+
+
+message ReadDirRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  // uint64 file_handle = 12;
+  string last_name = 12;
+  uint32 limit = 13;
+
+  bool with_attr = 14;
+}
+
+
+message ReadDirResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  message Entry {
+    string name = 1;
+    uint64 ino = 2;
+    Inode inode = 3;
+  }
+  
+  repeated Entry entries = 10;
+}
+
+
+message ReleaseDirRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  uint64 file_handle = 12;
+}
+
+message ReleaseDirResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+message OpenRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+}
+
+message OpenResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+message ReleaseRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+}
+
+message ReleaseResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
 
 message LinkRequest {
   RequestInfo request_info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
-  string name = 11;
-  uint64 inode_id = 12;
-  uint64 parent_inode_id = 13;
+  uint64 ino = 11;
+  uint64 new_parent_ino = 12;
+  string new_name = 13;
 }
 
 message LinkResponse {
   ResponseInfo response_info = 1;
   dingofs.pb.error.Error error = 2;
+
+  Inode inode = 10;
 }
 
 message UnLinkRequest {
@@ -622,7 +638,7 @@ message UnLinkRequest {
 
   uint32 fs_id = 10;
   string name = 11;
-  uint64 parent_inode_id = 12;
+  uint64 parent_ino = 12;
 }
 
 message UnLinkResponse {
@@ -636,15 +652,11 @@ message SymlinkRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  string name = 11;
-  uint32 flag = 12;
-  uint64 length = 13;
+  string symlink = 11;
+  uint64 new_parent_ino = 12;
+  string new_name = 13;
   uint32 uid = 14;
   uint32 gid = 15;
-  uint32 mode = 16;
-  uint64 parent_inode_id = 18;
-  uint64 rdev = 19;
-  string symlink = 20;   // TYPE_SYM_LINK only
 }
 
 message SymlinkResponse {
@@ -659,7 +671,7 @@ message ReadLinkRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 inode_id = 11;
+  uint64 ino = 11;
 }
 
 message ReadLinkResponse {
@@ -674,7 +686,7 @@ message GetAttrRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 inode_id = 11;
+  uint64 ino = 11;
 }
 
 message GetAttrResponse {
@@ -689,10 +701,9 @@ message SetAttrRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 inode_id = 11;
+  uint64 ino = 11;
 
-  // update field name,for example: ["ctime", "mtime", ...]
-  repeated string update_fields = 12;
+  uint32 to_set = 12;
 
   uint64 length = 20;
   uint64 ctime = 21;
@@ -715,7 +726,7 @@ message GetXAttrRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 inode_id = 11;
+  uint64 ino = 11;
   string name = 12;
 }
 
@@ -731,7 +742,7 @@ message SetXAttrRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 inode_id = 11;
+  uint64 ino = 11;
 
   map<string, bytes> xattrs = 12;
 }
@@ -746,7 +757,7 @@ message ListXAttrRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 inode_id = 11;
+  uint64 ino = 11;
 }
 
 message ListXAttrResponse {
@@ -761,9 +772,9 @@ message RenameRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 old_parent_inode_id = 11;
+  uint64 old_parent_ino = 11;
   string old_name = 12;
-  uint64 new_parent_inode_id = 13;
+  uint64 new_parent_ino = 13;
   string new_name = 14;
 }
 
@@ -772,6 +783,50 @@ message RenameResponse {
   dingofs.pb.error.Error error = 2;
 }
 
+message AllocSliceIdRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 alloc_num = 10;
+}
+
+message AllocSliceIdResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  repeated uint64 slice_ids = 10;
+}
+
+message WriteSliceRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  int64 chunk_index = 12;
+  SliceList slice_list = 13;
+}
+
+message WriteSliceResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+message ReadSliceRequest {
+  RequestInfo request_info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  int64 chunk_index = 12;
+}
+
+message ReadSliceResponse {
+  ResponseInfo response_info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  SliceList slice_list = 10;
+}
 
 service MDSService {
   // fs interface
@@ -780,26 +835,29 @@ service MDSService {
   rpc UmountFs(UmountFsRequest) returns (UmountFsResponse);
   rpc DeleteFs(DeleteFsRequest) returns (DeleteFsResponse);
   rpc GetFsInfo(GetFsInfoRequest) returns (GetFsInfoResponse);
+  rpc RefreshFsInfo(RefreshFsInfoRequest) returns (RefreshFsInfoResponse);
 
   // dentry interface
-  rpc CreateDentry(CreateDentryRequest) returns (CreateDentryResponse); // discard
-  rpc DeleteDentry(DeleteDentryRequest) returns (DeleteDentryResponse); // discard
   rpc GetDentry(GetDentryRequest) returns (GetDentryResponse);
   rpc ListDentry(ListDentryRequest) returns (ListDentryResponse);
 
   // inode interface
-  rpc CreateInode(CreateInodeRequest) returns (CreateInodeResponse); // discard
-  rpc DeleteInode(DeleteInodeRequest) returns (DeleteInodeResponse); // discard
-  rpc UpdateInode(UpdateInodeRequest) returns (UpdateInodeResponse); // discard
-  rpc UpdateS3Chunk(UpdateS3ChunkRequest) returns (UpdateS3ChunkResponse);
   rpc GetInode(GetInodeRequest) returns (GetInodeResponse);
   rpc BatchGetXAttr(BatchGetXAttrRequest) returns (BatchGetXAttrResponse);
   
   // high level interface
   rpc Lookup(LookupRequest) returns (LookupResponse);
+
   rpc MkNod(MkNodRequest) returns (MkNodResponse);
   rpc MkDir(MkDirRequest) returns (MkDirResponse);
   rpc RmDir(RmDirRequest) returns (RmDirResponse);
+  rpc OpenDir(OpenDirRequest) returns (OpenDirResponse); // deprecated
+  rpc ReadDir(ReadDirRequest) returns (ReadDirResponse);
+  rpc ReleaseDir(ReleaseDirRequest) returns (ReleaseDirResponse); // deprecated
+
+  rpc Open(OpenRequest) returns (OpenResponse);
+  rpc Release(ReleaseRequest) returns (ReleaseResponse);
+
   rpc Link(LinkRequest) returns (LinkResponse);
   rpc UnLink(UnLinkRequest) returns (UnLinkResponse);
   rpc Symlink(SymlinkRequest) returns (SymlinkResponse);
@@ -812,6 +870,11 @@ service MDSService {
   rpc ListXAttr(ListXAttrRequest) returns (ListXAttrResponse);
 
   rpc Rename(RenameRequest) returns (RenameResponse);
+
+  // slice interface
+  rpc AllocSliceId(AllocSliceIdRequest) returns (AllocSliceIdResponse);
+  rpc WriteSlice(WriteSliceRequest) returns (WriteSliceResponse);
+  rpc ReadSlice(ReadSliceRequest) returns (ReadSliceResponse);
 
   // quota interface
   rpc SetFsQuota(SetFsQuotaRequest) returns (SetFsQuotaResponse);
