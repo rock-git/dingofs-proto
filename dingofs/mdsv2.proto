@@ -158,6 +158,8 @@ message RequestInfo {
 
 message TimeInfo {
   int64 total_rpc_time_ns = 1;
+  int64 write_store_time_ns = 2;
+  int64 read_store_time_ns = 3;
 }
 
 message ResponseInfo {
