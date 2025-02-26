@@ -39,6 +39,7 @@ enum Errno {
   EOUT_OF_RANGE = 10014;
   ENO_DATA = 10015;
   ENOT_SERVE = 10016;
+  EINODE_DELETED = 10017;
   
   // cache error
 
