@@ -107,7 +107,8 @@ message FsInfo {
   string uuid = 16;
   FsExtra extra = 20;
 
-  uint64 last_update_time_ns = 30;
+  uint64 create_time_s = 30;
+  uint64 last_update_time_ns = 31;
 }
 
 message Slice {
