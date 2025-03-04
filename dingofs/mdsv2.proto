@@ -106,6 +106,8 @@ message FsInfo {
   uint32 recycle_time_hour = 15;
   string uuid = 16;
   FsExtra extra = 20;
+
+  uint64 last_update_time_ns = 30;
 }
 
 message Slice {
@@ -167,6 +169,8 @@ message ResponseInfo {
 }
 
 message Context {
+  // partition distribution epoch
+  uint64 epoch = 1;
 }
 
 // fs interface
@@ -249,7 +253,9 @@ message RefreshFsInfoRequest {
   RequestInfo request_info = 1;
   Context context = 2;
 
+  // fs name or fs id
   string fs_name = 10;
+  string fs_id = 11;
 }
 
 message RefreshFsInfoResponse {
@@ -555,11 +561,13 @@ message ReadDirRequest {
 
   uint32 fs_id = 10;
   uint64 ino = 11;
-  // uint64 file_handle = 12;
+
   string last_name = 12;
   uint32 limit = 13;
 
   bool with_attr = 14;
+
+  bool is_refresh = 15;
 }
 
 
