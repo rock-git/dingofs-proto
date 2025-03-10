@@ -256,7 +256,7 @@ message RefreshFsInfoRequest {
 
   // fs name or fs id
   string fs_name = 10;
-  string fs_id = 11;
+  uint32 fs_id = 11;
 }
 
 message RefreshFsInfoResponse {
