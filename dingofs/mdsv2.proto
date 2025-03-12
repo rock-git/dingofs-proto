@@ -156,28 +156,48 @@ message Inode {
 }
 
 message RequestInfo {
-  int64 request_id = 1;
+  uint64 request_id = 1;
 }
 
 message TimeInfo {
-  int64 total_rpc_time_ns = 1;
-  int64 write_store_time_ns = 2;
-  int64 read_store_time_ns = 3;
+  uint64 total_rpc_time_us = 1;
+  uint64 service_queue_wait_time_us = 2; 
+  uint64 file_pending_time_us = 3;
+  uint64 pending_time_us = 4;
+}
+
+message CacheInfo {
+  bool is_hit_partition = 1;
+  bool is_hit_inode = 2;
+}
+
+message TxnInfo {
+  uint64 txn_id = 1;
+  bool is_one_pc = 2;
+  bool is_conflict = 3;
+  uint64 read_time_us = 4;
+  uint64 write_time_us = 5;
+  uint32 retry = 6;
 }
 
 message ResponseInfo {
-  TimeInfo time_info = 1;
+  TimeInfo time = 1;
+  CacheInfo cache = 2;
+  repeated TxnInfo txns = 3;
 }
 
 message Context {
   // partition distribution epoch
   uint64 epoch = 1;
+
+  // ignore cache
+  bool is_bypass_cache = 2;
 }
 
 // fs interface
 
 message CreateFsRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   string fs_name = 10;
@@ -192,14 +212,14 @@ message CreateFsRequest {
 }
 
 message CreateFsResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   FsInfo fs_info = 10;
 }
 
 message MountFsRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   string fs_name = 10;
@@ -207,12 +227,12 @@ message MountFsRequest {
 }
 
 message MountFsResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message UmountFsRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   string fs_name = 10;
@@ -220,38 +240,38 @@ message UmountFsRequest {
 }
 
 message UmountFsResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message DeleteFsRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   string fs_name = 10;
 }
 
 message DeleteFsResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message GetFsInfoRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   string fs_name = 10;
 }
 
 message GetFsInfoResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   FsInfo fs_info = 10;
 }
 
 message RefreshFsInfoRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   // fs name or fs id
@@ -260,13 +280,13 @@ message RefreshFsInfoRequest {
 }
 
 message RefreshFsInfoResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 // dentry interface
 message GetDentryRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;  // required
@@ -276,14 +296,14 @@ message GetDentryRequest {
 
 
 message GetDentryResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Dentry dentry = 10;
 }
 
 message ListDentryRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10; // required
@@ -294,7 +314,7 @@ message ListDentryRequest {
 }
 
 message ListDentryResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   repeated Dentry dentries = 10;
@@ -302,7 +322,7 @@ message ListDentryResponse {
 
 // inode interface
 message GetInodeRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -310,14 +330,14 @@ message GetInodeRequest {
 }
 
 message GetInodeResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   optional Inode inode = 10;
 }
 
 message BatchGetXAttrRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -331,7 +351,7 @@ message XAttr {
 }
 
 message BatchGetXAttrResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   repeated XAttr xattrs = 10;
@@ -352,7 +372,7 @@ message Usage {
 };
 
 message SetFsQuotaRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -360,26 +380,26 @@ message SetFsQuotaRequest {
 };
 
 message SetFsQuotaResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 };
 
 message GetFsQuotaRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
 };
 
 message GetFsQuotaResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Quota quota = 10;
 };
 
 message FlushFsUsageRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -387,14 +407,14 @@ message FlushFsUsageRequest {
 };
 
 message FlushFsUsageResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Quota quota = 10;
 };
 
 message SetDirQuotaRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -403,12 +423,12 @@ message SetDirQuotaRequest {
 };
 
 message SetDirQuotaResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 };
 
 message GetDirQuotaRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -416,14 +436,14 @@ message GetDirQuotaRequest {
 };
 
 message GetDirQuotaResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Quota quota = 10;
 };
 
 message DeleteDirQuotaRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -431,26 +451,26 @@ message DeleteDirQuotaRequest {
 };
 
 message DeleteDirQuotaResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 };
 
 message LoadDirQuotasRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 4;
 };
 
 message LoadDirQuotasResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   map<uint64, Quota> quotas = 10;
 };
 
 message FlushDirUsagesRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -458,14 +478,14 @@ message FlushDirUsagesRequest {
 };
 
 message FlushDirUsagesResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 };
 
 // high level interface
 
 message LookupRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -474,14 +494,14 @@ message LookupRequest {
 }
 
 message LookupResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Inode inode = 10;
 }
 
 message MkNodRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -496,14 +516,14 @@ message MkNodRequest {
 }
 
 message MkNodResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Inode inode = 10;
 }
 
 message MkDirRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -518,14 +538,14 @@ message MkDirRequest {
 }
 
 message MkDirResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Inode inode = 10;
 }
 
 message RmDirRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -534,12 +554,12 @@ message RmDirRequest {
 }
 
 message RmDirResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message OpenDirRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -548,7 +568,7 @@ message OpenDirRequest {
 
 
 message OpenDirResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   // the file handle of the dir
@@ -557,7 +577,7 @@ message OpenDirResponse {
 
 
 message ReadDirRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -573,7 +593,7 @@ message ReadDirRequest {
 
 
 message ReadDirResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   message Entry {
@@ -587,7 +607,7 @@ message ReadDirResponse {
 
 
 message ReleaseDirRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -596,12 +616,12 @@ message ReleaseDirRequest {
 }
 
 message ReleaseDirResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message OpenRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -609,12 +629,12 @@ message OpenRequest {
 }
 
 message OpenResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message ReleaseRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -622,12 +642,12 @@ message ReleaseRequest {
 }
 
 message ReleaseResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message LinkRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -637,14 +657,14 @@ message LinkRequest {
 }
 
 message LinkResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Inode inode = 10;
 }
 
 message UnLinkRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -653,13 +673,13 @@ message UnLinkRequest {
 }
 
 message UnLinkResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 
 message SymlinkRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -671,14 +691,14 @@ message SymlinkRequest {
 }
 
 message SymlinkResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Inode inode = 10;
 }
 
 message ReadLinkRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -686,14 +706,14 @@ message ReadLinkRequest {
 }
 
 message ReadLinkResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   string symlink = 10;
 }
 
 message GetAttrRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -701,14 +721,14 @@ message GetAttrRequest {
 }
 
 message GetAttrResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Inode inode = 10;
 }
 
 message SetAttrRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -726,14 +746,14 @@ message SetAttrRequest {
 }
 
 message SetAttrResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   Inode inode = 10;
 }
 
 message GetXAttrRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -742,14 +762,14 @@ message GetXAttrRequest {
 }
 
 message GetXAttrResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   bytes value = 10;
 } 
 
 message SetXAttrRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -759,12 +779,12 @@ message SetXAttrRequest {
 }
 
 message SetXAttrResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message ListXAttrRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -772,14 +792,14 @@ message ListXAttrRequest {
 }
 
 message ListXAttrResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   map<string, bytes> xattrs = 10;
 }
 
 message RenameRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -790,26 +810,26 @@ message RenameRequest {
 }
 
 message RenameResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message AllocSliceIdRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 alloc_num = 10;
 }
 
 message AllocSliceIdResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   repeated uint64 slice_ids = 10;
 }
 
 message WriteSliceRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -819,12 +839,12 @@ message WriteSliceRequest {
 }
 
 message WriteSliceResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 }
 
 message ReadSliceRequest {
-  RequestInfo request_info = 1;
+  RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
@@ -833,7 +853,7 @@ message ReadSliceRequest {
 }
 
 message ReadSliceResponse {
-  ResponseInfo response_info = 1;
+  ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   SliceList slice_list = 10;
