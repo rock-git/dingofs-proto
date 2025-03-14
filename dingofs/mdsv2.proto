@@ -112,6 +112,7 @@ message FsInfo {
 }
 
 message Slice {
+  // slice id
   uint64 id = 1;
   uint64 compaction = 2;
   uint64 offset = 3;
@@ -859,6 +860,16 @@ message ReadSliceResponse {
   SliceList slice_list = 10;
 }
 
+message CheckAliveRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+}
+
+message CheckAliveResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
 service MDSService {
   // fs interface
   rpc CreateFs(CreateFsRequest) returns (CreateFsResponse);
@@ -916,4 +927,7 @@ service MDSService {
   rpc DeleteDirQuota(DeleteDirQuotaRequest) returns (DeleteDirQuotaResponse);
   rpc LoadDirQuotas(LoadDirQuotasRequest) returns (LoadDirQuotasResponse);
   rpc FlushDirUsages(FlushDirUsagesRequest) returns (FlushDirUsagesResponse);
+
+  // internal interface
+  rpc CheckAlive(CheckAliveRequest) returns (CheckAliveResponse);
 }
