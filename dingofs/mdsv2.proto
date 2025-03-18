@@ -112,6 +112,7 @@ message FsInfo {
 }
 
 message Slice {
+  // slice id
   uint64 id = 1;
   uint64 compaction = 2;
   uint64 offset = 3;
@@ -153,6 +154,9 @@ message Inode {
   // chunk index -> slice list
   map<uint64, SliceList> chunks = 20;
   map<string, bytes> xattrs = 21;
+
+  // when change field, need to update version
+  uint64 version = 30;
 }
 
 message RequestInfo {
@@ -190,8 +194,10 @@ message Context {
   // partition distribution epoch
   uint64 epoch = 1;
 
+  uint64 inode_version = 3;
+
   // ignore cache
-  bool is_bypass_cache = 2;
+  bool is_bypass_cache = 5;
 }
 
 // fs interface
@@ -812,6 +818,9 @@ message RenameRequest {
 message RenameResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
+
+  uint64 old_parent_version = 10;
+  uint64 new_parent_version = 11;
 }
 
 message AllocSliceIdRequest {
@@ -857,6 +866,29 @@ message ReadSliceResponse {
   dingofs.pb.error.Error error = 2;
 
   SliceList slice_list = 10;
+}
+
+message CheckAliveRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+}
+
+message CheckAliveResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+message RefreshInodeRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  repeated uint64 inoes = 11;
+}
+
+message RefreshInodeResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
 }
 
 service MDSService {
@@ -916,4 +948,8 @@ service MDSService {
   rpc DeleteDirQuota(DeleteDirQuotaRequest) returns (DeleteDirQuotaResponse);
   rpc LoadDirQuotas(LoadDirQuotasRequest) returns (LoadDirQuotasResponse);
   rpc FlushDirUsages(FlushDirUsagesRequest) returns (FlushDirUsagesResponse);
+
+  // internal interface
+  rpc CheckAlive(CheckAliveRequest) returns (CheckAliveResponse);
+  rpc RefreshInode(RefreshInodeRequest) returns (RefreshInodeResponse);
 }
