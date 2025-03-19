@@ -35,17 +35,19 @@ message GetFsResponse {
   repeated dingofs.pb.mdsv2.FsInfo fses = 10;
 }
 
-message GetDentryRequest {
+message GetPartitionRequest {
   dingofs.pb.mdsv2.RequestInfo info = 1;
 
   uint32 fs_id = 10;
+  // optional, if empty, return all partitions
   uint64 parent_ino = 11;
-  string name = 12; // optional, if empty, return all children
+  // optional, if empty, return all children
+  string name = 12;
 
   bool with_inode = 20;
 }
 
-message GetDentryResponse {
+message GetPartitionResponse {
   dingofs.pb.mdsv2.ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
@@ -54,8 +56,12 @@ message GetDentryResponse {
     dingofs.pb.mdsv2.Inode inode = 2;
   }
 
-  dingofs.pb.mdsv2.Inode parent_inode = 10;
-  repeated Entry child_entries = 11;
+  message Partition {
+    dingofs.pb.mdsv2.Inode parent_inode = 1;
+    repeated Entry entries = 2;
+  }
+
+  repeated Partition partitions = 10;
 }
 
 message GetInodeRequest {
@@ -94,7 +100,7 @@ message GetOpenFileResponse {
 
 service DebugService {
   rpc GetFs(GetFsRequest) returns (GetFsResponse);
-  rpc GetDentry(GetDentryRequest) returns (GetDentryResponse);
+  rpc GetPartition(GetPartitionRequest) returns (GetPartitionResponse);
   rpc GetInode(GetInodeRequest) returns (GetInodeResponse);
 
   rpc GetOpenFile(GetOpenFileRequest) returns (GetOpenFileResponse);
