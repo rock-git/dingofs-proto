@@ -1,0 +1,51 @@
+// Copyright (c) 2025 dingodb.com, Inc. All Rights Reserved
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+//
+
+syntax="proto2";
+package dingofs.pb.cache.blockcache;
+
+option cc_generic_services = true;
+option go_package = "dingofs/proto/blockcache";
+
+enum BlockCacheErrCode {
+    BlockCacheOk = 0;
+    BlockCacheErrUnknown = 1;
+    BlockCacheErrFailure = 2;
+    BlockCacheErrIOError = 3;
+    BlockCacheErrNotFound = 4;
+};
+
+message BlockKey {
+    required uint64 fs_id = 1;
+    required uint64 ino = 2;
+    required uint64 id = 3;
+    required uint64 index = 4;
+    required uint64 version = 5;
+};
+
+message RangeRequest {
+    required BlockKey block_key = 1;
+    required uint64 block_size = 2;
+    required uint64 offset = 3;
+    required uint64 length = 4;
+};
+
+message RangeResponse {
+ required BlockCacheErrCode status = 1;
+};
+
+service BlockCacheService {
+    rpc Range(RangeRequest) returns (RangeResponse);
+};
