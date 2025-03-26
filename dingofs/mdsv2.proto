@@ -22,6 +22,40 @@ option cc_generic_services = true;
 option go_package = "dingofs/proto/mdsv2";
 
 
+enum Role {
+  ROLE_MDS = 0;
+  ROLE_CLIENT = 1;
+}
+
+message Location {
+  string host = 1;
+  int32 port = 2;
+}
+
+message MDS {
+  enum State {
+    INIT = 0;
+    NORMAL = 1;
+    ABNORMAL = 2;
+  }
+
+  int64 id = 1;
+  Location location = 2;
+
+  State state = 4;
+
+  uint64 register_time_ms = 10;
+  uint64 last_online_time_ms = 11;
+}
+
+message Client {
+  string hostname = 1;
+  uint32 port = 2;
+  string path = 3;
+
+  uint64 last_online_time_ms = 4;
+}
+
 enum FsType {
   S3 = 0; //  use s3 as backend data store
   RADOS = 1; // use ceph rados as backend data store
@@ -200,6 +234,34 @@ message Context {
   bool is_bypass_cache = 5;
 }
 
+message HeartbeatRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  Role role = 10;
+  oneof node {
+    MDS mds = 20;
+    Client client = 21;
+  }
+}
+
+message HeartbeatResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+message GetMDSListRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+}
+
+message GetMDSListResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  repeated MDS mdses = 10;
+}
+
 // fs interface
 
 message CreateFsRequest {
@@ -276,6 +338,31 @@ message GetFsInfoResponse {
   FsInfo fs_info = 10;
 }
 
+message ListFsInfoRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+}
+
+message ListFsInfoResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  repeated FsInfo fs_infos = 10;
+}
+
+message UpdateFsInfoRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  string fs_name = 10;
+  FsInfo fs_info = 11;
+}
+
+message UpdateFsInfoResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
 message RefreshFsInfoRequest {
   RequestInfo info = 1;
   Context context = 2;
@@ -295,8 +382,8 @@ message GetDentryRequest {
   RequestInfo info = 1;
   Context context = 2;
 
-  uint32 fs_id = 10;  // required
-  uint64 ino = 11; // either ino or name 
+  uint32 fs_id = 10;
+  uint64 parent = 11;
   string name = 12;
 }
 
@@ -312,11 +399,14 @@ message ListDentryRequest {
   RequestInfo info = 1;
   Context context = 2;
 
-  uint32 fs_id = 10; // required
-  uint64 ino = 11; // parent inode id
-  string last = 12;     // the name of last entry
-  uint32 limit = 13;    // the number of entry required
-  bool is_only_dir = 14; // is only list dir
+  uint32 fs_id = 10;
+  uint64 parent = 11;
+  // the name of last entry
+  string last = 12;
+  // the number of entry
+  uint32 limit = 13;
+  // is only list dir
+  bool is_only_dir = 14;
 }
 
 message ListDentryResponse {
@@ -342,18 +432,32 @@ message GetInodeResponse {
   optional Inode inode = 10;
 }
 
+message BatchGetInodeRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  repeated uint64 inoes = 11;
+}
+
+message BatchGetInodeResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  repeated Inode inodes = 10;
+}
+
 message BatchGetXAttrRequest {
   RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
-  repeated uint64 inode_ids = 11;
+  repeated uint64 inoes = 11;
 }
 
 message XAttr {
-  uint32 fs_id = 1;
-  uint64 ino = 2;
-  map<string, bytes> xattrs = 3;
+  uint64 ino = 1;
+  map<string, bytes> xattrs = 2;
 }
 
 message BatchGetXAttrResponse {
@@ -424,7 +528,7 @@ message SetDirQuotaRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 dir_inode_id = 11;
+  uint64 ino = 11;
   Quota quota = 12;
 };
 
@@ -438,7 +542,7 @@ message GetDirQuotaRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 dir_inode_id = 11;
+  uint64 ino = 11;
 };
 
 message GetDirQuotaResponse {
@@ -453,7 +557,7 @@ message DeleteDirQuotaRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
-  uint64 dir_inode_id = 11;
+  uint64 ino = 11;
 };
 
 message DeleteDirQuotaResponse {
@@ -480,6 +584,7 @@ message FlushDirUsagesRequest {
   Context context = 2;
 
   uint32 fs_id = 10;
+  // ino -> usage
   map<uint64, Usage> usages = 11;
 };
 
@@ -868,6 +973,59 @@ message ReadSliceResponse {
   SliceList slice_list = 10;
 }
 
+message FsStatsData {
+  uint64 read_bytes= 1;
+  uint64 read_qps = 2;
+  uint64 write_bytes= 3;
+  uint64 write_qps = 4;
+  uint64 s3_read_bytes= 5;
+  uint64 s3_read_qps = 6;
+  uint64 s3_write_bytes= 7;
+  uint64 s3_write_qps = 8;
+}
+
+message SetFsStatsRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  string fs_name = 10;
+  FsStatsData stats = 11;
+}
+
+message SetFsStatsResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+message GetFsStatsRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  string fs_name = 10;
+}
+
+message GetFsStatsResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  FsStatsData stats = 10;
+}
+
+message GetFsPerSecondStatsRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  string fs_name = 10;
+}
+
+message GetFsPerSecondStatsResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  // time_s -> stats
+  map<uint64, FsStatsData> stats = 10;
+}
+
 message CheckAliveRequest {
   RequestInfo info = 1;
   Context context = 2;
@@ -892,12 +1050,18 @@ message RefreshInodeResponse {
 }
 
 service MDSService {
+  // mds
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetMDSList(GetMDSListRequest) returns (GetMDSListResponse);
+
   // fs interface
   rpc CreateFs(CreateFsRequest) returns (CreateFsResponse);
   rpc MountFs(MountFsRequest) returns (MountFsResponse);
   rpc UmountFs(UmountFsRequest) returns (UmountFsResponse);
   rpc DeleteFs(DeleteFsRequest) returns (DeleteFsResponse);
   rpc GetFsInfo(GetFsInfoRequest) returns (GetFsInfoResponse);
+  rpc ListFsInfo(ListFsInfoRequest) returns (ListFsInfoResponse);
+  rpc UpdateFsInfo(UpdateFsInfoRequest) returns (UpdateFsInfoResponse);
   rpc RefreshFsInfo(RefreshFsInfoRequest) returns (RefreshFsInfoResponse);
 
   // dentry interface
@@ -906,6 +1070,7 @@ service MDSService {
 
   // inode interface
   rpc GetInode(GetInodeRequest) returns (GetInodeResponse);
+  rpc BatchGetInode(BatchGetInodeRequest) returns (BatchGetInodeResponse);
   rpc BatchGetXAttr(BatchGetXAttrRequest) returns (BatchGetXAttrResponse);
   
   // high level interface
@@ -948,6 +1113,12 @@ service MDSService {
   rpc DeleteDirQuota(DeleteDirQuotaRequest) returns (DeleteDirQuotaResponse);
   rpc LoadDirQuotas(LoadDirQuotasRequest) returns (LoadDirQuotasResponse);
   rpc FlushDirUsages(FlushDirUsagesRequest) returns (FlushDirUsagesResponse);
+
+
+  // fs statistics
+  rpc SetFsStats(SetFsStatsRequest) returns (SetFsStatsResponse);
+  rpc GetFsStats(GetFsStatsRequest) returns (GetFsStatsResponse);
+  rpc GetFsPerSecondStats(GetFsPerSecondStatsRequest) returns (GetFsPerSecondStatsResponse);
 
   // internal interface
   rpc CheckAlive(CheckAliveRequest) returns (CheckAliveResponse);
