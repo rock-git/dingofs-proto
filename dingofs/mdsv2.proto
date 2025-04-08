@@ -149,8 +149,11 @@ message Slice {
   // slice id
   uint64 id = 1;
   uint64 compaction = 2;
+  // file offset
   uint64 offset = 3;
+  // file logic length
   uint64 len = 4;
+  // file size in object storage
   uint64 size = 5;
   bool zero = 6;
 };
@@ -232,6 +235,9 @@ message Context {
 
   // ignore cache
   bool is_bypass_cache = 5;
+
+  // host:port:path
+  string client_id = 10;
 }
 
 message HeartbeatRequest {
@@ -731,6 +737,12 @@ message ReleaseDirResponse {
   dingofs.pb.error.Error error = 2;
 }
 
+message FileSession {
+  string session_id = 1;
+  string client_id = 2;
+  uint64 ino = 3;
+}
+
 message OpenRequest {
   RequestInfo info = 1;
   Context context = 2;
@@ -742,6 +754,8 @@ message OpenRequest {
 message OpenResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
+
+  string session_id = 10;
 }
 
 message ReleaseRequest {
@@ -750,6 +764,7 @@ message ReleaseRequest {
 
   uint32 fs_id = 10;
   uint64 ino = 11;
+  string session_id = 12;
 }
 
 message ReleaseResponse {
