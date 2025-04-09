@@ -90,8 +90,8 @@ message S3Info {
   string sk = 2;
   string endpoint = 3;
   string bucketname = 4;
-  uint64 block_size = 5;
-  uint64 chunk_size = 6;
+  // uint64 block_size = 5;
+  // uint64 chunk_size = 6; // deprecated
   uint32 object_prefix = 7;
 }
 
@@ -133,7 +133,8 @@ message FsInfo {
   uint64 root_ino = 5;
   uint64 capacity = 6;
   uint64 block_size = 7;
-  repeated MountPoint mount_points = 8;
+  uint64 chunk_size = 8;
+  repeated MountPoint mount_points = 9;
   PartitionPolicy partition_policy = 10;
   bool enable_sum_in_dir = 12; // enable sum in dir
   string owner = 13;
@@ -276,13 +277,14 @@ message CreateFsRequest {
 
   string fs_name = 10;
   uint64 block_size = 11;
-  FsType fs_type = 12;
-  FsExtra fs_extra = 13;
-  bool enable_sum_in_dir = 14;
-  string owner = 15;
-  uint64 capacity = 16;
-  uint32 recycle_time_hour = 17;
-  PartitionType partition_type = 18;
+  uint64 chunk_size = 12;
+  FsType fs_type = 13;
+  FsExtra fs_extra = 14;
+  bool enable_sum_in_dir = 15;
+  string owner = 16;
+  uint64 capacity = 17;
+  uint32 recycle_time_hour = 18;
+  PartitionType partition_type = 19;
 }
 
 message CreateFsResponse {
