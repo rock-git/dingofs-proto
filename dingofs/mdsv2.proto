@@ -990,6 +990,47 @@ message ReadSliceResponse {
   SliceList slice_list = 10;
 }
 
+message TrashSlice {
+  uint32 fs_id = 1;
+  uint64 ino = 2;
+  uint64 chunk_index = 3;
+  uint64 slice_id = 4;
+  // file offset
+  uint64 offset = 5;
+  // file logic length
+  uint64 len = 6;
+}
+
+message CompactChunkRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  uint64 chunk_index = 12;
+}
+
+message CompactChunkResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  repeated TrashSlice trash_slices = 10;
+}
+
+message CleanTrashFileDataRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+}
+
+message CleanTrashFileDataResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+}
+
+
 message FsStatsData {
   uint64 read_bytes= 1;
   uint64 read_qps = 2;
@@ -1120,6 +1161,10 @@ service MDSService {
   rpc AllocSliceId(AllocSliceIdRequest) returns (AllocSliceIdResponse);
   rpc WriteSlice(WriteSliceRequest) returns (WriteSliceResponse);
   rpc ReadSlice(ReadSliceRequest) returns (ReadSliceResponse);
+
+  // compact interface
+  rpc CompactChunk(CompactChunkRequest) returns (CompactChunkResponse);
+  rpc CleanTrashFileData(CleanTrashFileDataRequest) returns (CleanTrashFileDataResponse);
 
   // quota interface
   rpc SetFsQuota(SetFsQuotaRequest) returns (SetFsQuotaResponse);
