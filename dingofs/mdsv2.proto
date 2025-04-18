@@ -163,6 +163,13 @@ message SliceList {
   repeated Slice slices = 1;
 };
 
+message Chunk {
+  uint64 index = 1;
+  repeated Slice slices = 2;
+
+  uint64 version = 10;
+}
+
 message Dentry {
   uint32 fs_id = 1;
   uint64 ino = 2;
@@ -189,8 +196,7 @@ message Inode {
   uint32 dtime = 17;
   uint32 openmpcount = 18;
   repeated uint64 parent_inos = 19;
-  // chunk index -> slice list
-  map<uint64, SliceList> chunks = 20;
+
   map<string, bytes> xattrs = 21;
 
   // when change field, need to update version
@@ -991,31 +997,59 @@ message ReadSliceResponse {
 }
 
 message TrashSlice {
+  message Range {
+    // file offset
+    uint64 offset = 1;
+    // file logic length
+    uint64 len = 2;
+  }
+
   uint32 fs_id = 1;
   uint64 ino = 2;
   uint64 chunk_index = 3;
   uint64 slice_id = 4;
-  // file offset
-  uint64 offset = 5;
-  // file logic length
-  uint64 len = 6;
+  uint64 chunk_size = 5;
+
+  bool is_partial = 7;
+  repeated Range ranges = 8;
 }
 
-message CompactChunkRequest {
+message TrashSliceList {
+  repeated TrashSlice slices = 1;
+}
+
+message CompactRequest {
   RequestInfo info = 1;
   Context context = 2;
 
   uint32 fs_id = 10;
   uint64 ino = 11;
+  // 0 means all chunks
   uint64 chunk_index = 12;
 }
 
-message CompactChunkResponse {
+message CompactResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
   repeated TrashSlice trash_slices = 10;
 }
+
+message CompactAllRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+}
+
+message CompactAllResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  uint64 checked_count = 10;
+  uint64 compacted_count = 11;
+}
+
 
 message CleanTrashFileDataRequest {
   RequestInfo info = 1;
@@ -1163,7 +1197,8 @@ service MDSService {
   rpc ReadSlice(ReadSliceRequest) returns (ReadSliceResponse);
 
   // compact interface
-  rpc CompactChunk(CompactChunkRequest) returns (CompactChunkResponse);
+  rpc Compact(CompactRequest) returns (CompactResponse);
+  rpc CompactAll(CompactAllRequest) returns (CompactAllResponse);
   rpc CleanTrashFileData(CleanTrashFileDataRequest) returns (CleanTrashFileDataResponse);
 
   // quota interface
