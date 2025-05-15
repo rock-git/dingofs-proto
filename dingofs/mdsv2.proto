@@ -79,10 +79,11 @@ enum FileType {
 };
 
 message MountPoint {
-  string hostname = 1;
-  uint32 port = 2;
-  string path = 3;
-  bool cto = 4;
+  string client_id = 1;
+  string hostname = 2;
+  uint32 port = 3;
+  string path = 4;
+  bool cto = 5;
 }
 
 message S3Info {
@@ -90,8 +91,6 @@ message S3Info {
   string sk = 2;
   string endpoint = 3;
   string bucketname = 4;
-  // uint64 block_size = 5;
-  // uint64 chunk_size = 6; // deprecated
   uint32 object_prefix = 7;
 }
 
@@ -144,12 +143,15 @@ message FsInfo {
 
   uint64 create_time_s = 30;
   uint64 last_update_time_ns = 31;
+
+  bool is_deleted = 40;
+  uint64 delete_time_s = 41;
 }
 
 message Slice {
   // slice id
   uint64 id = 1;
-  uint64 compaction = 2;
+  uint64 compaction_version = 2;
   // file offset
   uint64 offset = 3;
   // file logic length
@@ -159,13 +161,14 @@ message Slice {
   bool zero = 6;
 };
 
-message SliceList {
-  repeated Slice slices = 1;
-};
 
 message Chunk {
+  // chunk index
   uint64 index = 1;
-  repeated Slice slices = 2;
+  // chunk size
+  uint64 size = 2;
+  // slice list
+  repeated Slice slices = 3;
 
   uint64 version = 10;
 }
@@ -199,6 +202,8 @@ message Inode {
 
   map<string, bytes> xattrs = 21;
 
+  map<uint64, Chunk> chunks = 22;
+
   // when change field, need to update version
   uint64 version = 30;
 }
@@ -208,10 +213,14 @@ message RequestInfo {
 }
 
 message TimeInfo {
-  uint64 total_rpc_time_us = 1;
-  uint64 service_queue_wait_time_us = 2; 
-  uint64 file_pending_time_us = 3;
-  uint64 pending_time_us = 4;
+  message ElapsedTime {
+    string name = 1;
+    uint64 time_us = 2;
+  }
+
+  uint64 total_time_us = 1;
+  uint64 queue_wait_time_us = 2;
+  repeated ElapsedTime elapsed_times = 3;
 }
 
 message CacheInfo {
@@ -225,7 +234,6 @@ message TxnInfo {
   bool is_conflict = 3;
   uint64 read_time_us = 4;
   uint64 write_time_us = 5;
-  uint32 retry = 6;
 }
 
 message ResponseInfo {
@@ -331,6 +339,10 @@ message DeleteFsRequest {
   Context context = 2;
 
   string fs_name = 10;
+  // force delete, check if fs is mounted
+  // if true, delete fs even if it is mounted
+  // if false, return error if it is mounted
+  bool is_force = 11;
 }
 
 message DeleteFsResponse {
@@ -757,6 +769,7 @@ message OpenRequest {
 
   uint32 fs_id = 10;
   uint64 ino = 11;
+  uint32 flags = 12;
 }
 
 message OpenResponse {
@@ -956,13 +969,16 @@ message AllocSliceIdRequest {
   Context context = 2;
 
   uint32 alloc_num = 10;
+  // alloc slice id must be greater than this value
+  // this is used to avoid slice id rollback
+  uint64 min_slice_id = 11;
 }
 
 message AllocSliceIdResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
-  repeated uint64 slice_ids = 10;
+  uint64 slice_id = 10;
 }
 
 message WriteSliceRequest {
@@ -972,7 +988,7 @@ message WriteSliceRequest {
   uint32 fs_id = 10;
   uint64 ino = 11;
   int64 chunk_index = 12;
-  SliceList slice_list = 13;
+  repeated Slice slices = 13;
 }
 
 message WriteSliceResponse {
@@ -993,7 +1009,7 @@ message ReadSliceResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
-  SliceList slice_list = 10;
+  repeated Slice slices = 10;
 }
 
 message TrashSlice {
