@@ -711,9 +711,9 @@ message BatchCreateResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
+  Inode parent_inode = 9;
   repeated Inode inodes = 10;
   repeated string session_ids = 11;
-  uint64 parent_version = 12;
 }
 
 message MkNodRequest {
@@ -735,8 +735,36 @@ message MkNodResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
+  Inode parent_inode = 9;
   Inode inode = 10;
-  uint64 parent_version = 11;
+}
+
+message BatchMkNodRequest {
+  message Param {
+    string name = 1;
+    uint32 flag = 2;
+    uint64 length = 3;
+    uint32 uid = 4;
+    uint32 gid = 5;
+    uint32 mode = 6;
+    uint64 parent = 7;
+    uint64 rdev = 8;
+  }
+
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 parent = 11;
+  repeated Param params = 12;
+}
+
+message BatchMkNodResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  Inode parent_inode = 10;
+  repeated Inode inodes = 11;  
 }
 
 message MkDirRequest {
@@ -754,12 +782,41 @@ message MkDirRequest {
   uint64 rdev = 19;
 }
 
+
 message MkDirResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
+  Inode parent_inode = 9;
   Inode inode = 10;
-  uint64 parent_version = 11;
+}
+
+message BatchMkDirRequest {
+  message Param {
+    string name = 1;
+    uint32 flag = 2;
+    uint64 length = 3;
+    uint32 uid = 4;
+    uint32 gid = 5;
+    uint32 mode = 6;
+    uint64 parent = 7;
+    uint64 rdev = 8;
+  }
+
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 parent = 11;
+  repeated Param params = 12;
+}
+
+message BatchMkDirResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  Inode parent_inode = 10;
+  repeated Inode inode = 11;
 }
 
 message RmDirRequest {
@@ -775,8 +832,8 @@ message RmDirResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
+  Inode parent_inode = 9;
   uint64 ino = 11;
-  uint64 parent_version = 10;
 }
 
 message ReadDirRequest {
@@ -867,8 +924,8 @@ message LinkResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
+  Inode parent_inode = 9;
   Inode inode = 10;
-  uint64 parent_version = 11;
 }
 
 message UnLinkRequest {
@@ -884,8 +941,25 @@ message UnLinkResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
+  Inode parent_inode = 10;
   Inode inode = 11;
-  uint64 parent_version = 10;
+}
+
+message BatchUnLinkRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 parent = 11;
+  repeated string names = 12;
+}
+
+message BatchUnLinkResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  Inode parent_inode = 10;
+  repeated Inode inodes = 11;
 }
 
 message SymlinkRequest {
@@ -904,8 +978,8 @@ message SymlinkResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
+  Inode parent_inode = 9;
   Inode inode = 10;
-  uint64 parent_version = 11;
 }
 
 message ReadLinkRequest {
@@ -1532,7 +1606,9 @@ service MDSService {
   rpc BatchCreate(BatchCreateRequest) returns (BatchCreateResponse);
 
   rpc MkNod(MkNodRequest) returns (MkNodResponse);
+  rpc BatchMkNod(BatchMkNodRequest) returns (BatchMkNodResponse);
   rpc MkDir(MkDirRequest) returns (MkDirResponse);
+  rpc BatchMkDir(BatchMkDirRequest) returns (BatchMkDirResponse);
   rpc RmDir(RmDirRequest) returns (RmDirResponse);
   rpc ReadDir(ReadDirRequest) returns (ReadDirResponse);
 
@@ -1541,6 +1617,7 @@ service MDSService {
 
   rpc Link(LinkRequest) returns (LinkResponse);
   rpc UnLink(UnLinkRequest) returns (UnLinkResponse);
+  rpc BatchUnLink(BatchUnLinkRequest) returns (BatchUnLinkResponse);
   rpc Symlink(SymlinkRequest) returns (SymlinkResponse);
   rpc ReadLink(ReadLinkRequest) returns (ReadLinkResponse);
 
