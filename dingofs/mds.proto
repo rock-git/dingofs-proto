@@ -270,11 +270,11 @@ message Inode {
 }
 
 message RequestInfo {
+  // as trace id
   string request_id = 1;
   // client request timeout in milliseconds
   uint32 timeout_ms = 2;
 
-  string trace_id = 3;
   string span_id = 4;
 
   uint32 retry_times = 5;
@@ -1250,13 +1250,23 @@ message CompactChunkRequest {
   uint32 fs_id = 10;
   uint64 ino = 11;
   uint64 chunk_index = 12;
+  uint64 version = 13;
+
+  // use new_slices replace slices in [start_slice_id, end_slice_id)
+  uint32 start_pos = 14;
+  uint64 start_slice_id = 15;
+
+  uint32 end_pos = 16;
+  uint64 end_slice_id = 17;
+  
+  repeated Slice new_slices = 18;
 }
 
 message CompactChunkResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
-  repeated TrashSlice trash_slices = 10;
+  Chunk chunk = 10;
 }
 
 message CleanTrashSliceRequest {
