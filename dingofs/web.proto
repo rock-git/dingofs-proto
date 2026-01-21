@@ -30,6 +30,6 @@ service FsStatService {
 message FuseStatRequest {};
 message FuseStatResponse {};
 
-service FuseStatService {
+service ClientStatService {
   rpc default_method(FuseStatRequest) returns (FuseStatResponse);
 }
