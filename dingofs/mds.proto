@@ -265,6 +265,8 @@ message Inode {
   uint32 flags = 20;
   map<string, bytes> xattrs = 21;
 
+  bool maybe_tiny_file = 25;
+
   // when change field, need to update version
   uint64 version = 30;
 }
@@ -705,6 +707,8 @@ message BatchCreateRequest {
     uint32 gid = 5;
     uint32 mode = 6;
     uint64 rdev = 7;
+
+    string session_id = 8;
   }
 
   RequestInfo info = 1;
@@ -721,7 +725,6 @@ message BatchCreateResponse {
 
   Inode parent_inode = 9;
   repeated Inode inodes = 10;
-  repeated string session_ids = 11;
 }
 
 message MkNodRequest {
@@ -891,7 +894,9 @@ message OpenRequest {
   uint32 fs_id = 10;
   uint64 ino = 11;
   uint32 flags = 12;
+  string session_id = 16;
   bool prefetch_chunk = 13;
+  bool prefetch_data = 15;
   repeated ChunkDescriptor chunk_descriptors = 14;
 }
 
@@ -899,9 +904,10 @@ message OpenResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
 
-  string session_id = 10;
   Inode inode = 11;
   repeated Chunk chunks = 12;
+  bytes data = 13;
+  uint64 data_version = 14;
 }
 
 message ReleaseRequest {
@@ -916,6 +922,25 @@ message ReleaseRequest {
 message ReleaseResponse {
   ResponseInfo info = 1;
   dingofs.pb.error.Error error = 2;
+}
+
+message  FlushFileRequest {
+  RequestInfo info = 1;
+  Context context = 2;
+
+  uint32 fs_id = 10;
+  uint64 ino = 11;
+  uint64 length = 13;
+  bytes data = 14;
+  uint64 data_version = 15;
+}
+
+message  FlushFileResponse {
+  ResponseInfo info = 1;
+  dingofs.pb.error.Error error = 2;
+
+  Inode inode = 10;
+  bool shrink_file = 11;
 }
 
 message LinkRequest {
@@ -1634,6 +1659,7 @@ service MDSService {
 
   rpc Open(OpenRequest) returns (OpenResponse);
   rpc Release(ReleaseRequest) returns (ReleaseResponse);
+  rpc FlushFile(FlushFileRequest) returns (FlushFileResponse);
 
   rpc Link(LinkRequest) returns (LinkResponse);
   rpc UnLink(UnLinkRequest) returns (UnLinkResponse);
