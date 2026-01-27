@@ -50,6 +50,7 @@ enum Errno {
   EINVALID_STATE = 10025;
   ENOT_CAN_CONNECTED = 10026;
   ETIMEOUT = 10027;
+  EDELETED = 10028;
   
   // cache error
 
