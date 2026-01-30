@@ -348,13 +348,27 @@ message EchoResponse {
 }
 
 message HeartbeatRequest {
+  message FileSession {
+    uint64 ino = 1;
+    repeated string session_ids = 2;
+  }
+
+  message ClientInfo {
+    uint32 fs_id = 1;
+
+    Client client = 2;
+  
+    // for refresh file session expire time
+    repeated FileSession file_sessions = 3;
+  }
+
   RequestInfo info = 1;
   Context context = 2;
 
   Role role = 10;
   oneof node {
     MDS mds = 20;
-    Client client = 21;
+    ClientInfo client = 21;
     CacheGroupMember cache_group_member = 22;
   }
 }
@@ -885,7 +899,9 @@ message FileSession {
   string session_id = 4;
 
   uint64 create_time_s = 10;
+  uint64 expire_time_s = 11;
 }
+
 
 message OpenRequest {
   RequestInfo info = 1;
