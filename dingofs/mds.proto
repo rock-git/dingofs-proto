@@ -229,6 +229,8 @@ message Chunk {
     uint64 time_ms = 2;
   }
   repeated CompactedSlice compacted_slices = 20;
+
+  uint64 expire_time_s = 30;
 }
 
 message ChunkDescriptor {
